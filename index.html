@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 FocusHub - 专注工作空间</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #000; color: #fff; min-height: 100vh; overflow: hidden; }
+        
+        /* Ambient background */
+        .ambient { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .ambient::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 30%, rgba(120, 119, 198, 0.3), transparent 50%), radial-gradient(circle at 70% 70%, rgba(74, 85, 104, 0.3), transparent 50%); animation: ambientMove 20s ease-in-out infinite; }
+        @keyframes ambientMove { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(-5%, -5%); } }
+        
+        .container { position: relative; z-index: 1; height: 100vh; display: flex; flex-direction: column; padding: 40px; }
+        
+        /* Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .logo { font-size: 1.5rem; font-weight: 300; letter-spacing: 2px; }
+        .time-display { font-size: 3rem; font-weight: 100; letter-spacing: 2px; }
+        
+        /* Main content */
+        .main { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        
+        /* Left - Timer */
+        .timer-section { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .timer-circle { width: 300px; height: 300px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; position: relative; }
+        .timer-circle::before { content: ''; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid transparent; border-top-color: #fff; animation: spin 2s linear infinite; }
+        .timer-circle.paused::before { animation-play-state: paused; }
+        
+        .timer-text { font-size: 5rem; font-weight: 100; letter-spacing: 4px; }
+        .timer-label { font-size: 1rem; color: rgba(255,255,255,0.5); margin-top: 10px; text-transform: uppercase; letter-spacing: 3px; }
+        
+        .timer-controls { display: flex; gap: 20px; margin-top: 40px; }
+        .timer-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 15px 40px; border-radius: 30px; color: #fff; font-size: 1rem; cursor: pointer; transition: all 0.3s; letter-spacing: 2px; }
+        .timer-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+        .timer-btn.primary { background: #fff; color: #000; }
+        
+        .timer-modes { display: flex; gap: 15px; margin-top: 30px; }
+        .mode-btn { background: none; border: 1px solid rgba(255,255,255,0.2); padding: 8px 20px; border-radius: 20px; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 0.85rem; transition: all 0.3s; }
+        .mode-btn.active { background: rgba(255,255,255,0.1); color: #fff; border-color: #fff; }
+        
+        /* Right - Tasks */
+        .tasks-section { display: flex; flex-direction: column; }
+        .section-title { font-size: 0.9rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 3px; margin-bottom: 20px; }
+        
+        .task-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 15px 20px; border-radius: 10px; color: #fff; font-size: 1rem; margin-bottom: 20px; width: 100%; }
+        .task-input:focus { outline: none; border-color: rgba(255,255,255,0.3); }
+        
+        .task-list { flex: 1; overflow-y: auto; }
+        .task-item { display: flex; align-items: center; gap: 15px; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 10px; margin-bottom: 10px; transition: all 0.3s; }
+        .task-item:hover { background: rgba(255,255,255,0.08); }
+        .task-item.completed { opacity: 0.4; }
+        .task-checkbox { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+        .task-checkbox.checked { background: #fff; }
+        .task-content { flex: 1; }
+        .task-title { font-size: 1rem; margin-bottom: 3px; }
+        .task-time { font-size: 0.75rem; color: rgba(255,255,255,0.4); }
+        
+        /* Stats bar */
+        .stats-bar { display: flex; gap: 40px; margin-top: 30px; padding-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 2rem; font-weight: 100; }
+        .stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 2px; }
+        
+        /* Focus message */
+        .focus-message { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); font-size: 0.9rem; letter-spacing: 2px; }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 768px) {
+            .main { grid-template-columns: 1fr; }
+            .timer-circle { width: 200px; height: 200px; }
+            .timer-text { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient"></div>
+    
+    <div class="container">
+        <div class="header">
+            <div class="logo">FOCUSHUB</div>
+            <div class="time-display" id="timeDisplay">00:00</div>
+        </div>
+        
+        <div class="main">
+            <div class="timer-section">
+                <div class="timer-circle" id="timerCircle">
+                    <div>
+                        <div class="timer-text" id="timerText">25:00</div>
+                        <div class="timer-label" id="timerLabel">专注时间</div>
+                    </div>
+                </div>
+                
+                <div class="timer-modes">
+                    <button class="mode-btn active" onclick="setMode(25, 'focus')">专注 25分钟</button>
+                    <button class="mode-btn" onclick="setMode(5, 'short')">短休 5分钟</button>
+                    <button class="mode-btn" onclick="setMode(15, 'long')">长休 15分钟</button>
+                </div>
+                
+                <div class="timer-controls">
+                    <button class="timer-btn primary" id="startBtn" onclick="toggleTimer()">开始</button>
+                    <button class="timer-btn" onclick="resetTimer()">重置</button>
+                </div>
+                
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <div class="stat-value" id="todaySessions">0</div>
+                        <div class="stat-label">今日专注</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalMinutes">0</div>
+                        <div class="stat-label">总分钟</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="streak">0</div>
+                        <div class="stat-label">连续天数</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tasks-section">
+                <div class="section-title">待办事项</div>
+                <input type="text" class="task-input" id="taskInput" placeholder="添加新任务..." onkeypress="addTask(event)">
+                <div class="task-list" id="taskList"></div>
+            </div>
+        </div>
+        
+        <div class="focus-message" id="focusMessage">保持专注，你是最棒的 💪</div>
+    </div>
+    
+    <script>
+        // Data
+        let data = JSON.parse(localStorage.getItem('focushub') || '{"tasks":[],"sessions":0,"totalMinutes":0,"streak":0,"lastDate":""}');
+        let timerTime = 25 * 60;
+        let timerRunning = false;
+        let timerInterval = null;
+        let currentMode = 'focus';
+        
+        // Init
+        updateTime();
+        setInterval(updateTime, 1000);
+        renderTasks();
+        updateStats();
+        
+        function saveData() {
+            localStorage.setItem('focushub', JSON.stringify(data));
+        }
+        
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('timeDisplay').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        
+        // Timer
+        function setMode(minutes, mode) {
+            currentMode = mode;
+            timerTime = minutes * 60;
+            timerRunning = false;
+            clearInterval(timerInterval);
+            updateTimerDisplay();
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const labels = { focus: '专注时间', short: '短休', long: '长休' };
+            document.getElementById('timerLabel').textContent = labels[mode];
+            document.getElementById('timerCircle').classList.remove('paused');
+            document.getElementById('startBtn').textContent = '开始';
+        }
+        
+        function toggleTimer() {
+            if (timerRunning) {
+                clearInterval(timerInterval);
+                document.getElementById('startBtn').textContent = '继续';
+                document.getElementById('timerCircle').classList.add('paused');
+            } else {
+                document.getElementById('startBtn').textContent = '暂停';
+                document.getElementById('timerCircle').classList.remove('paused');
+                
+                timerInterval = setInterval(() => {
+                    timerTime--;
+                    updateTimerDisplay();
+                    
+                    if (timerTime <= 0) {
+                        clearInterval(timerInterval);
+                        timerRunning = false;
+                        playNotification();
+                        
+                        if (currentMode === 'focus') {
+                            data.sessions++;
+                            data.totalMinutes += 25;
+                            updateStreak();
+                            saveData();
+                            updateStats();
+                        }
+                        
+                        const messages = {
+                            focus: '🎉 专注完成！休息一下吧',
+                            short: '⏰ 短休结束，开始专注吧',
+                            long: '☕ 长休结束，继续加油！'
+                        };
+                        document.getElementById('focusMessage').textContent = messages[currentMode];
+                        
+                        setMode(25, 'focus');
+                    }
+                }, 1000);
+            }
+            timerRunning = !timerRunning;
+        }
+        
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            const minutes = currentMode === 'focus' ? 25 : currentMode === 'short' ? 5 : 15;
+            timerTime = minutes * 60;
+            updateTimerDisplay();
+            document.getElementById('startBtn').textContent = '开始';
+            document.getElementById('timerCircle').classList.remove('paused');
+        }
+        
+        function updateTimerDisplay() {
+            const m = Math.floor(timerTime / 60).toString().padStart(2, '0');
+            const s = (timerTime % 60).toString().padStart(2, '0');
+            document.getElementById('timerText').textContent = m + ':' + s;
+        }
+        
+        function playNotification() {
+            if (Notification.permission === 'granted') {
+                new Notification('FocusHub', { body: '时间到！' });
+            }
+            alert('⏰ 时间到！');
+        }
+        
+        // Request notification permission
+        if (Notification.permission !== 'granted') {
+            Notification.requestPermission();
+        }
+        
+        // Streak
+        function updateStreak() {
+            const today = new Date().toDateString();
+            const yesterday = new Date(Date.now() - 86400000).toDateString();
+            
+            if (data.lastDate === yesterday) {
+                data.streak++;
+            } else if (data.lastDate !== today) {
+                data.streak = 1;
+            }
+            data.lastDate = today;
+        }
+        
+        function updateStats() {
+            document.getElementById('todaySessions').textContent = data.sessions;
+            document.getElementById('totalMinutes').textContent = data.totalMinutes;
+            document.getElementById('streak').textContent = data.streak;
+        }
+        
+        // Tasks
+        function addTask(e) {
+            if (e.key !== 'Enter') return;
+            const input = document.getElementById('taskInput');
+            const title = input.value.trim();
+            if (!title) return;
+            
+            data.tasks.unshift({
+                id: Date.now(),
+                title,
+                completed: false,
+                created: new Date().toISOString()
+            });
+            
+            input.value = '';
+            saveData();
+            renderTasks();
+        }
+        
+        function renderTasks() {
+            const list = document.getElementById('taskList');
+            if (!data.tasks.length) {
+                list.innerHTML = '<div style="color:rgba(255,255,255,0.3);text-align:center;padding:40px">暂无任务</div>';
+                return;
+            }
+            
+            list.innerHTML = data.tasks.map(t => `
+                <div class="task-item ${t.completed ? 'completed' : ''}">
+                    <div class="task-checkbox ${t.completed ? 'checked' : ''}" onclick="toggleTask(${t.id})">
+                        ${t.completed ? '✓' : ''}
+                    </div>
+                    <div class="task-content">
+                        <div class="task-title">${t.title}</div>
+                        <div class="task-time">${new Date(t.created).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                    <button onclick="deleteTask(${t.id})" style="background:none;border:none;color:rgba(255,255,255,0.3);cursor:pointer;font-size:1.2rem">×</button>
+                </div>
+            `).join('');
+        }
+        
+        function toggleTask(id) {
+            const task = data.tasks.find(t => t.id === id);
+            if (task) task.completed = !task.completed;
+            saveData();
+            renderTasks();
+        }
+        
+        function deleteTask(id) {
+            data.tasks = data.tasks.filter(t => t.id !== id);
+            saveData();
+            renderTasks();
+        }
+    </script>
+</body>
+</html>
